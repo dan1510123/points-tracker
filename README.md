@@ -143,10 +143,10 @@ Optional, and off until you set it up. It puts one JSON file — the same one **
 GitHub gist, so a laptop and a desktop can hold the same ledger without a database, a server, or an account anywhere new.
 Same mechanism the perk-graph project uses.
 
-1. Go to `github.com/settings/tokens` → **Fine-grained tokens** → **Generate new token**.
-2. Under *Account permissions*, set **Gists** to **Read and write**. Grant nothing else — no repository access is needed
-   or wanted.
-3. Copy the token.
+1. Go to `github.com/settings/tokens/new` — a **classic** token (Tokens (classic) → Generate new token). This must be a
+   classic token: fine-grained tokens don't work with the gist API, and a push with one fails with a 404.
+2. Check only the **gist** scope. Nothing else — it needs no repository or other access. Optionally set an expiry.
+3. Generate and copy the token.
 4. Settings → **Sync to a private gist** → paste the token, leave **Gist id** blank → **Push to gist**. A private gist is
    created and its id appears in the field.
 5. On the other device, paste the same token and that gist id, then **Pull from gist**.

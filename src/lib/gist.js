@@ -1,14 +1,14 @@
 /**
  * Sync the whole store to a private GitHub gist.
  *
- * Same shape as the perk-graph sync: a fine-grained token scoped to
- * "Gists: read and write" and nothing else, kept in this browser only and
- * sent only to api.github.com. The gist holds one file — the same JSON the
- * Download button gives you — so it stays readable and restorable by hand.
+ * A classic GitHub token with only the "gist" scope, kept in this browser and
+ * sent only to api.github.com. (Fine-grained tokens are rejected by the gist
+ * API with a bare 404, so classic is required.) The gist holds one file — the
+ * same JSON the Export button gives you — so it stays readable and restorable
+ * by hand.
  *
- * The token deliberately never reaches our own server: data/store.json is
- * committed to nothing and backed up locally, and a credential on disk would
- * be the one secret in a project that otherwise has none.
+ * There is no server for the token to reach even if it wanted to: the app is
+ * fully static, so the credential never leaves the browser.
  */
 
 const FILENAME = 'points-tracker.json';
@@ -99,7 +99,7 @@ const headers = (token) => ({
   'X-GitHub-Api-Version': '2022-11-28',
 });
 
-async function call(url, token, init = {}) {
+async function call(url, token, init = {}, ctx = {}) {
   const res = await fetch(url, { ...init, headers: { ...headers(token), ...(init.headers || {}) } });
   if (!res.ok) {
     // GitHub's error bodies are JSON but long; the first line is the useful part.
@@ -107,10 +107,16 @@ async function call(url, token, init = {}) {
     try {
       detail = (await res.json()).message || detail;
     } catch { /* non-JSON body */ }
-    // The two failures that actually happen get plain-English replacements;
-    // "GitHub returned 401" tells the user nothing they can act on.
-    if (res.status === 401) throw new Error('That token was rejected — check it has Gists: read and write, and has not expired.');
-    if (res.status === 404) throw new Error('No gist with that id is visible to this token.');
+    // The gist API is picky about token type, and its "you can't" answer is a
+    // bare 404 with no hint — so translate the failures into something the user
+    // can act on, and never blame a gist id on a create that supplied none.
+    const scopeHelp = 'Use a classic token (github.com/settings/tokens/new) with the "gist" scope checked. Fine-grained tokens do not work with the gist API.';
+    if (res.status === 401) throw new Error(`That token was rejected — check it is correct and has not expired. ${scopeHelp}`);
+    if (res.status === 403) throw new Error(`That token isn't allowed to use gists. ${scopeHelp}`);
+    if (res.status === 404) {
+      if (ctx.creating) throw new Error(`GitHub wouldn't create a gist with this token. ${scopeHelp}`);
+      throw new Error('No gist with that id is visible to this token — check the id, and that the token can read it.');
+    }
     throw new Error(`GitHub returned ${res.status} — ${detail}`);
   }
   return res.json();
@@ -159,7 +165,7 @@ export async function pushStore({ token, gistId, data, force = false }) {
     method: gistId ? 'PATCH' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }, { creating: !gistId });
 
   saveCreds(token, gist.id);
   markSeen(gist.id, gist.updated_at);

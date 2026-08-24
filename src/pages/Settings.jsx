@@ -309,10 +309,11 @@ export default function Settings() {
       <div className="card pad-lg" style={{ marginTop: 16 }}>
         <h2>Sync to a private gist</h2>
         <p className="muted small">
-          Optional, and off until you fill this in. Make a fine-grained token at{' '}
-          <code>github.com/settings/tokens</code> with <strong>Gists: read and write</strong> and nothing else — it
-          needs no access to any repository. The token stays in this browser and is sent only to{' '}
-          <code>api.github.com</code>. Leave the gist id blank the first time and a private one gets created for you.
+          Optional, and off until you fill this in. Make a <strong>classic</strong> token at{' '}
+          <code>github.com/settings/tokens/new</code> with only the <strong>gist</strong> scope checked — that's the one
+          the gist API accepts (fine-grained tokens don't work with gists). The token stays in this browser and is sent
+          only to <code>api.github.com</code>. Leave the gist id blank the first time and a private one gets created for
+          you.
         </p>
 
         <div className="row">
@@ -322,7 +323,7 @@ export default function Settings() {
               type="password"
               value={sync.token}
               onChange={setSyncField('token')}
-              placeholder="github_pat_…"
+              placeholder="ghp_…"
               autoComplete="off"
               spellCheck={false}
             />
