@@ -1,0 +1,29 @@
+{
+  "name": "points-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Local-only tracker for credit card and airline loyalty points across Amex, Chase, Delta, Bilt and Alaska.",
+  "scripts": {
+    "dev": "concurrently -n server,web -c magenta,cyan \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "node server/index.js",
+    "dev:web": "vite",
+    "build": "vite build",
+    "start": "cross-env NODE_ENV=production node server/index.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "vite": "^8.2.1"
+  }
+}
