@@ -4,7 +4,9 @@ A local-only ledger of the points you **have** and the points you've **ever used
 
 No optimizer, no offers, no card-application tracking. Two questions only: what do I hold, and what did I spend?
 
-Runs entirely on your machine. No accounts, no credentials, no cloud. Data lives in `data/store.json`.
+Runs entirely on your machine. No accounts, no cloud, nothing leaves the box — unless you switch on the optional
+[private-gist sync](#sync-between-devices-through-a-private-gist) to carry the file between your own devices. Data
+lives in `data/store.json`.
 
 ## Run it
 
@@ -36,7 +38,7 @@ This is the main thing that differs from commercial trackers, which apply their 
 - **Points I have** — current balance per program, entered by hand; each save records a dated snapshot so a trend builds over time, plus points earned all time per program
 - **Points I've used** — the redemption ledger: add, edit, filter, search — and transfers to partners, plus a duplicate check over everything logged
 - **Import CSV** — bulk-backfill redemption history from a CSV or JSON file
-- **Settings** — cents-per-point per program, add/remove programs, backup and restore
+- **Settings** — cents-per-point per program, add/remove programs, backup and restore, and private-gist sync
 
 ## Duplicates are blocked
 
@@ -129,7 +131,40 @@ data/backups/          timestamped copies
 
 Settings → **Write a backup** makes a copy on demand; **Download JSON** and **Restore from a JSON export** move data between machines.
 
+## Sync between devices through a private gist
+
+Optional, and off until you set it up. It puts one JSON file — the same one **Download JSON** gives you — in a private
+GitHub gist, so a laptop and a desktop can hold the same ledger without a database, a server, or an account anywhere new.
+Same mechanism the perk-graph project uses.
+
+1. Go to `github.com/settings/tokens` → **Fine-grained tokens** → **Generate new token**.
+2. Under *Account permissions*, set **Gists** to **Read and write**. Grant nothing else — no repository access is needed
+   or wanted.
+3. Copy the token.
+4. Settings → **Sync to a private gist** → paste the token, leave **Gist id** blank → **Push to gist**. A private gist is
+   created and its id appears in the field.
+5. On the other device, paste the same token and that gist id, then **Pull from gist**.
+
+After that it's two buttons: **Push to gist** writes this device's data up, **Pull from gist** brings the other device's
+data down. **Forget token** clears both fields from this browser and leaves the gist itself alone. The sidebar shows
+which gist is in play, or `local only` when sync is off.
+
+### What it costs you in privacy
+
+The token lives in this browser's `localStorage` and is sent to `api.github.com` and nowhere else — in particular it is
+never sent to this project's own server, so it never lands in `data/` or anywhere on disk. The gist is created private.
+Private is not secret: anyone with the URL can read it, and GitHub can. If that's not a trade you want, skip this
+section entirely — everything else in the app works without it.
+
+### Conflicts
+
+Gists have no compare-and-swap, so last write wins and there is nothing to stop one device silently overwriting the
+other. What the app does instead: it remembers the gist's `updated_at` from the last time *this* browser synced, and
+checks it before pushing. If the gist has moved since — almost always the other device having pushed — the push stops
+and asks, naming the time it was written, before it overwrites anything. Pulling first is the way out.
+
+A pull replaces everything on this device, and backs up `data/store.json` into `data/backups/` before it does.
+
 ## Adding programs
 
 Settings → Add a program. Works for hotel currencies, other airlines, anything with a point balance.
-# points-tracker

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useStore } from './StoreContext.jsx';
+import { subscribe, getGistId } from './lib/gist.js';
 import Dashboard from './pages/Dashboard.jsx';
 import Redemptions from './pages/Redemptions.jsx';
 import RedemptionForm from './pages/RedemptionForm.jsx';
@@ -34,6 +35,8 @@ function activePath(pathname) {
 export default function App() {
   const { store, error, setError } = useStore();
   const active = activePath(useLocation().pathname);
+  // '' when sync is off, so the footer can say plainly where the data goes.
+  const gistId = useSyncExternalStore(subscribe, getGistId, () => '');
 
   return (
     <div className="layout">
@@ -49,9 +52,11 @@ export default function App() {
           </NavLink>
         ))}
         <div className="sidebar-foot">
-          Local only. Data lives in
+          Data lives in
           <br />
           <code>data/store.json</code>
+          <br />
+          {gistId ? <>syncing to gist <code>{gistId.slice(0, 7)}</code></> : 'local only'}
         </div>
       </nav>
 

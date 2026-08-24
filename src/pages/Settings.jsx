@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../StoreContext.jsx';
 import { api } from '../api.js';
 import { holdingsSummary, redemptionSummary, fmtUSD } from '../lib/calc.js';
+import { getCreds, forgetCreds, pushStore, pullStore, GistConflictError } from '../lib/gist.js';
 
 const PALETTE = ['#2E77BC', '#117ACA', '#C8102E', '#111111', '#01426A', '#3ec97a', '#f0b429', '#a06cd5'];
 
@@ -12,6 +13,9 @@ export default function Settings() {
   const [newProgram, setNewProgram] = useState({ name: '', issuer: '', cpp: 1.5, color: PALETTE[5] });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [sync, setSync] = useState(() => getCreds());
+  const [syncBusy, setSyncBusy] = useState('');
+  const [syncMsg, setSyncMsg] = useState(null);
 
   const held = holdingsSummary(store);
   const redeemed = redemptionSummary(store);
@@ -75,6 +79,62 @@ export default function Settings() {
     } catch (err) {
       setMsg(`Could not read that file: ${err.message}`);
     }
+  }
+
+  const setSyncField = (k) => (e) => setSync((c) => ({ ...c, [k]: e.target.value.trim() }));
+  const said = (ok, text) => setSyncMsg({ ok, text });
+
+  async function push(force = false) {
+    setSyncBusy('push');
+    setSyncMsg(null);
+    try {
+      const res = await pushStore({ ...sync, data: store, force });
+      setSync((c) => ({ ...c, gistId: res.gistId }));
+      said(true, res.created
+        ? `Created private gist ${res.gistId} and pushed your data. Paste that id on your other device.`
+        : `Pushed. The gist now matches this device as of ${new Date(res.updatedAt).toLocaleString()}.`);
+    } catch (err) {
+      if (err instanceof GistConflictError) {
+        const when = new Date(err.remoteUpdatedAt).toLocaleString();
+        // No ETag on gists, so this prompt is the only thing standing between
+        // a second device's push and a silent overwrite of it.
+        const go = confirm(
+          `That gist was written at ${when}, after the last time this device synced with it — ` +
+          `most likely from another device.\n\nPushing now overwrites it. Pull first if you want to see it.`
+        );
+        if (go) return push(true);
+        said(false, 'Push cancelled. Pull to see the other device\u2019s copy first.');
+      } else {
+        said(false, err.message);
+      }
+    } finally {
+      setSyncBusy('');
+    }
+  }
+
+  async function pull() {
+    setSyncBusy('pull');
+    setSyncMsg(null);
+    try {
+      const { data, updatedAt } = await pullStore(sync);
+      if (!confirm('Replace all data on this device with the gist copy? Your current data is backed up first.')) {
+        said(false, 'Pull cancelled. Nothing on this device changed.');
+        return;
+      }
+      await api.importStore(data);
+      await refresh();
+      said(true, `Pulled the copy saved ${new Date(updatedAt).toLocaleString()}.`);
+    } catch (err) {
+      said(false, err.message);
+    } finally {
+      setSyncBusy('');
+    }
+  }
+
+  function forget() {
+    forgetCreds();
+    setSync({ token: '', gistId: '' });
+    said(true, 'Token and gist id cleared from this browser. The gist itself is untouched.');
   }
 
   const preview = (cppOverride) => {
@@ -204,8 +264,8 @@ export default function Settings() {
       <div className="card pad-lg">
         <h2>Data</h2>
         <p className="muted small">
-          Everything lives in <code>data/store.json</code> next to this project — no cloud, no credentials, no third
-          party. Back it up or copy it anywhere.
+          Everything lives in <code>data/store.json</code> next to this project. Nothing leaves this machine unless you
+          turn on gist sync below. Back it up or copy it anywhere.
         </p>
         <div className="row" style={{ alignItems: 'center' }}>
           <div style={{ flex: '0 0 auto' }}>
@@ -219,6 +279,68 @@ export default function Settings() {
             <input type="file" accept="application/json,.json" onChange={(e) => importStore(e.target.files?.[0])} />
           </div>
         </div>
+      </div>
+
+      <div className="card pad-lg" style={{ marginTop: 16 }}>
+        <h2>Sync to a private gist</h2>
+        <p className="muted small">
+          Optional, and off until you fill this in. Make a fine-grained token at{' '}
+          <code>github.com/settings/tokens</code> with <strong>Gists: read and write</strong> and nothing else — it
+          needs no access to any repository. The token stays in this browser and is sent only to{' '}
+          <code>api.github.com</code>. Leave the gist id blank the first time and a private one gets created for you.
+        </p>
+
+        <div className="row">
+          <div className="field">
+            <label>Token</label>
+            <input
+              type="password"
+              value={sync.token}
+              onChange={setSyncField('token')}
+              placeholder="github_pat_…"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="field">
+            <label>Gist id</label>
+            <input
+              className="mono"
+              value={sync.gistId}
+              onChange={setSyncField('gistId')}
+              placeholder="created on first push"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+
+        <div className="row" style={{ alignItems: 'center' }}>
+          <div style={{ flex: '0 0 auto' }}>
+            <button onClick={() => push()} disabled={!!syncBusy || !sync.token}>
+              {syncBusy === 'push' ? 'Pushing…' : 'Push to gist'}
+            </button>
+          </div>
+          <div style={{ flex: '0 0 auto' }}>
+            <button className="ghost" onClick={pull} disabled={!!syncBusy || !sync.token || !sync.gistId}>
+              {syncBusy === 'pull' ? 'Pulling…' : 'Pull from gist'}
+            </button>
+          </div>
+          <div style={{ flex: '0 0 auto' }}>
+            <button className="danger" onClick={forget} disabled={!!syncBusy}>Forget token</button>
+          </div>
+          <div />{/* spacer: keeps the buttons from stretching across the row */}
+        </div>
+
+        {syncMsg && (
+          <div className={syncMsg.ok ? 'notice' : 'error'} style={{ marginTop: 14, marginBottom: 0 }}>
+            {syncMsg.text}
+          </div>
+        )}
+
+        <p className="muted small" style={{ marginTop: 14, marginBottom: 0 }}>
+          Push overwrites the gist; pull overwrites this device, backing up <code>data/store.json</code> first. If the
+          gist moved since this device last synced, the push stops and asks before clobbering the other copy.
+        </p>
       </div>
     </>
   );
