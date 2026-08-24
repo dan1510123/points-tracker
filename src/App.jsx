@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useStore } from './StoreContext.jsx';
 import { subscribe, getGistId } from './lib/gist.js';
@@ -37,9 +37,29 @@ export default function App() {
   const active = activePath(useLocation().pathname);
   // '' when sync is off, so the footer can say plainly where the data goes.
   const gistId = useSyncExternalStore(subscribe, getGistId, () => '');
+  // Off-canvas nav drawer, mobile only (the CSS ignores this class ≥ 720px).
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="layout">
+    <div className={`layout${menuOpen ? ' menu-open' : ''}`}>
+      {/* Mobile-only top bar: brand + hamburger. Hidden by CSS on desktop. */}
+      <header className="topbar">
+        <div className="brand">
+          Points<span>Tracker</span>
+        </div>
+        <button
+          className="ghost hamburger"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          {menuOpen ? '✕' : '☰'}
+        </button>
+      </header>
+
+      {/* Tap-to-close scrim behind the open drawer. */}
+      <div className="scrim" onClick={() => setMenuOpen(false)} />
+
       <nav className="sidebar">
         <div className="brand">
           Points<span>Tracker</span>
@@ -47,7 +67,12 @@ export default function App() {
         {/* className as a function: passing a string would get NavLink's own
             prefix-matched "active" class appended on top of ours. */}
         {NAV.map(([to, label]) => (
-          <NavLink key={to} to={to} className={() => `navlink${to === active ? ' active' : ''}`}>
+          <NavLink
+            key={to}
+            to={to}
+            className={() => `navlink${to === active ? ' active' : ''}`}
+            onClick={() => setMenuOpen(false)}
+          >
             {label}
           </NavLink>
         ))}
