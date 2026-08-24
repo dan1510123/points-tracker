@@ -62,22 +62,44 @@ export default function Settings() {
     await mutate(() => api.remove('programs', p.id));
   }
 
-  async function makeBackup() {
-    const res = await api.backup();
-    setMsg(res.backup ? `Backup written to ${res.backup}` : 'Nothing to back up yet.');
+  // A full snapshot of everything — programs, redemptions, settings — as a
+  // single JSON file. This is the whole backup; import it to restore.
+  function exportData() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `points-tracker-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    const counts = `${store.programs.length} programs, ${store.redemptions.length} entries`;
+    setMsg(`Exported points-tracker-backup-${stamp}.json (${counts}). Keep it somewhere safe.`);
   }
 
-  async function importStore(file) {
+  async function importData(file) {
     if (!file) return;
-    const text = await file.text();
+    let parsed;
     try {
-      const parsed = JSON.parse(text);
-      if (!confirm('Replace all current data with this file? Your existing data is backed up first.')) return;
-      await api.importStore(parsed);
-      await refresh();
-      setMsg('Data restored from file.');
+      parsed = JSON.parse(await file.text());
     } catch (err) {
-      setMsg(`Could not read that file: ${err.message}`);
+      setMsg(`Could not read that file — it isn't valid JSON. (${err.message})`);
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.redemptions) || !Array.isArray(parsed.programs)) {
+      setMsg("That file doesn't look like a Points Tracker backup — it's missing the programs or redemptions list.");
+      return;
+    }
+    const counts = `${parsed.programs.length} programs and ${parsed.redemptions.length} entries`;
+    if (!confirm(`Replace everything on this device with this backup (${counts})?\n\nYour current data is snapshotted first, so this is undoable.`)) return;
+    try {
+      await api.importStore(parsed); // snapshots the current store, then swaps it in
+      await refresh();
+      setMsg(`Imported ${counts}. Everything on this device now matches the backup.`);
+    } catch (err) {
+      setMsg(`Import failed: ${err.message}`);
     }
   }
 
@@ -264,21 +286,24 @@ export default function Settings() {
       <div className="card pad-lg">
         <h2>Data</h2>
         <p className="muted small">
-          Everything lives in <code>data/store.json</code> next to this project. Nothing leaves this machine unless you
-          turn on gist sync below. Back it up or copy it anywhere.
+          Your data lives in this browser. Nothing leaves the device unless you export it or turn on gist sync below.
+          Because it's per-browser, <strong>Export app data</strong> is your backup and the way to move everything to
+          another browser or device — export here, then <strong>Import app data</strong> there.
         </p>
         <div className="row" style={{ alignItems: 'center' }}>
           <div style={{ flex: '0 0 auto' }}>
-            <button className="ghost" onClick={makeBackup}>Write a backup</button>
-          </div>
-          <div style={{ flex: '0 0 auto' }}>
-            <a href="/api/export"><button className="ghost">Download JSON</button></a>
+            <button onClick={exportData}>Export app data</button>
           </div>
           <div className="field" style={{ margin: 0 }}>
-            <label>Restore from a JSON export</label>
-            <input type="file" accept="application/json,.json" onChange={(e) => importStore(e.target.files?.[0])} />
+            <label>Import app data (replaces everything on this device)</label>
+            <input type="file" accept="application/json,.json" onChange={(e) => { importData(e.target.files?.[0]); e.target.value = ''; }} />
           </div>
         </div>
+        <p className="muted small" style={{ marginTop: 12, marginBottom: 0 }}>
+          Every import snapshots the current data first, so a wrong file is undoable — and a backup is written before a
+          gist pull, too. Clearing this site's browser data erases everything here, so keep an exported file somewhere
+          safe.
+        </p>
       </div>
 
       <div className="card pad-lg" style={{ marginTop: 16 }}>
@@ -338,8 +363,8 @@ export default function Settings() {
         )}
 
         <p className="muted small" style={{ marginTop: 14, marginBottom: 0 }}>
-          Push overwrites the gist; pull overwrites this device, backing up <code>data/store.json</code> first. If the
-          gist moved since this device last synced, the push stops and asks before clobbering the other copy.
+          Push overwrites the gist; pull overwrites this device, snapshotting the current data first. If the gist moved
+          since this device last synced, the push stops and asks before clobbering the other copy.
         </p>
       </div>
     </>

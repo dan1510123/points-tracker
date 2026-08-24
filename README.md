@@ -1,12 +1,12 @@
 # Points Tracker
 
-A local-only ledger of the points you **have** and the points you've **ever used**, across Amex, Chase, Delta, Bilt, Alaska, and anything else you add.
+A ledger of the points you **have** and the points you've **ever used**, across Amex, Chase, Delta, Bilt, Alaska, and anything else you add.
 
 No optimizer, no offers, no card-application tracking. Two questions only: what do I hold, and what did I spend?
 
-Runs entirely on your machine. No accounts, no cloud, nothing leaves the box — unless you switch on the optional
-[private-gist sync](#sync-between-devices-through-a-private-gist) to carry the file between your own devices. Data
-lives in `data/store.json`.
+A static single-page app — no server, no accounts, no database. Your data lives in your browser and nothing leaves the
+device unless you export it or turn on the optional [private-gist sync](#sync-between-devices-through-a-private-gist).
+Runs from any static host; a [GitHub Pages deploy](#deploying-to-github-pages) is wired up.
 
 ## Run it
 
@@ -15,15 +15,13 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173
+Then open http://localhost:5173/points-tracker/ (the `/points-tracker/` base matches where it lives on GitHub Pages).
 
-`npm run dev` starts two processes: the API server on port 5174 (which owns the data file) and the Vite dev server on 5173 (which proxies `/api` to it).
-
-To run it as a single process instead:
+That's the whole thing — one Vite dev server, no backend. To preview a production build locally:
 
 ```bash
 npm run build
-npm start          # serves the built app + API on http://localhost:5174
+npm run preview
 ```
 
 ## How value is calculated
@@ -38,7 +36,7 @@ This is the main thing that differs from commercial trackers, which apply their 
 - **Points I have** — current balance per program, entered by hand; each save records a dated snapshot so a trend builds over time, plus points earned all time per program
 - **Points I've used** — the redemption ledger: add, edit, filter, search — and transfers to partners, plus a duplicate check over everything logged
 - **Import CSV** — bulk-backfill redemption history from a CSV or JSON file
-- **Settings** — cents-per-point per program, add/remove programs, backup and restore, and private-gist sync
+- **Settings** — cents-per-point per program, add/remove programs, export/import all app data, and private-gist sync
 
 ## Duplicates are blocked
 
@@ -122,14 +120,22 @@ Expect gaps. Partial history still answers the question — just be aware the to
 
 ## Your data
 
-```
-data/store.json        everything
-data/backups/          timestamped copies
-```
+Everything — programs, redemptions, settings — is one JSON object in your browser's `localStorage`, under the key
+`pointstracker:store`. There is no server and no file on disk; the same JSON you'd have found in `data/store.json` in the
+old server-backed version now lives in the browser.
 
-`data/` is gitignored. The server writes atomically (temp file + rename), so an interrupted save can't leave you with a half-written store, and an unreadable file gets quarantined into `backups/` rather than overwritten.
+That has one consequence worth internalizing: **`localStorage` is per-browser and per-origin.** The dev app on
+`localhost` and the deployed app on `github.io` keep *separate* copies, and clearing the site's browser data wipes it.
+So back up by exporting:
 
-Settings → **Write a backup** makes a copy on demand; **Download JSON** and **Restore from a JSON export** move data between machines.
+- **Settings → Export app data** downloads the whole store as `points-tracker-backup-<date>.json`. This is your backup
+  and the way to move everything to another browser or device.
+- **Settings → Import app data** replaces everything on the current device with a backup file. It snapshots the current
+  data first (an in-browser safety net, kept for the last several writes), so importing the wrong file is undoable.
+- **[Private-gist sync](#sync-between-devices-through-a-private-gist)** is the automated version of the same round-trip.
+
+An unreadable `localStorage` value is set aside rather than silently overwritten, the same way the old server quarantined
+a corrupt `store.json`.
 
 ## Sync between devices through a private gist
 
@@ -151,8 +157,8 @@ which gist is in play, or `local only` when sync is off.
 
 ### What it costs you in privacy
 
-The token lives in this browser's `localStorage` and is sent to `api.github.com` and nowhere else — in particular it is
-never sent to this project's own server, so it never lands in `data/` or anywhere on disk. The gist is created private.
+The token lives in this browser's `localStorage` and is sent to `api.github.com` and nowhere else. There is no backend
+for it to reach even if it wanted to — the app is entirely static. The gist is created private.
 Private is not secret: anyone with the URL can read it, and GitHub can. If that's not a trade you want, skip this
 section entirely — everything else in the app works without it.
 
@@ -163,7 +169,25 @@ other. What the app does instead: it remembers the gist's `updated_at` from the 
 checks it before pushing. If the gist has moved since — almost always the other device having pushed — the push stops
 and asks, naming the time it was written, before it overwrites anything. Pulling first is the way out.
 
-A pull replaces everything on this device, and backs up `data/store.json` into `data/backups/` before it does.
+A pull replaces everything on this device, and snapshots the current data (the same in-browser safety net that Import
+uses) before it does.
+
+## Deploying to GitHub Pages
+
+The repo ships a workflow at `.github/workflows/deploy.yml` that builds the app and publishes it on every push to
+`main`. One-time setup:
+
+1. Push to GitHub (public or private both work; Pages is available on public repos, and on private with a paid plan).
+2. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. Push, or run the workflow manually from the **Actions** tab. It lands at
+   `https://<user>.github.io/points-tracker/`.
+
+The Vite `base` is set to `/points-tracker/` to match that URL. If you rename the repo, change `base` in
+[`vite.config.js`](vite.config.js) to `/<new-name>/`. Routing uses hash URLs (`#/settings`), so no server rewrites are
+needed — a plain static host is enough.
+
+Because your data lives in the browser, the deployed site starts empty. Move your data in with **Settings → Import app
+data** (from an exported backup) or gist sync — nothing personal is ever built into the site or committed to the repo.
 
 ## Adding programs
 

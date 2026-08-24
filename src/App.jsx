@@ -52,9 +52,7 @@ export default function App() {
           </NavLink>
         ))}
         <div className="sidebar-foot">
-          Data lives in
-          <br />
-          <code>data/store.json</code>
+          Data lives in this browser
           <br />
           {gistId ? <>syncing to gist <code>{gistId.slice(0, 7)}</code></> : 'local only'}
         </div>
