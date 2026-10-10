@@ -113,10 +113,14 @@ tbody tr:hover { background: var(--panel-2); }
 /* Inline program edit (Settings): colour swatch + name side by side. */
 .edit-name { display: flex; align-items: center; gap: 8px; min-width: 200px; }
 .color-pick {
-  flex: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--line);
-  color: transparent; cursor: pointer; appearance: none; -webkit-appearance: none;
+  flex: none; width: 28px; height: 28px; padding: 0; border: 2px solid var(--line); border-radius: 50%;
+  background: none; cursor: pointer; overflow: hidden; appearance: none; -webkit-appearance: none;
 }
-.color-pick option { color: #fff; }
+.color-pick::-webkit-color-swatch-wrapper { padding: 0; }
+.color-pick::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.color-pick::-moz-color-swatch { border: 0; border-radius: 50%; }
+.color-pick:hover { border-color: var(--accent); }
+.color-field { display: flex; align-items: center; gap: 10px; height: 35px; }
 .field-error { color: var(--bad); font-size: 12px; margin-top: 4px; }
 
 /* A sortable header is a button, but has to read as a header. */

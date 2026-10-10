@@ -8,11 +8,18 @@ import { applyRemote, noteSynced, subscribeStatus, getStatus } from '../lib/sync
 
 const PALETTE = ['#2E77BC', '#117ACA', '#C8102E', '#111111', '#01426A', '#3ec97a', '#f0b429', '#a06cd5'];
 
+// <input type="color"> only accepts #rrggbb, so widen #rgb and fall back for anything else.
+const toHex6 = (c) => {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c || '').trim());
+  if (!m) return PALETTE[5];
+  return m[1].length === 3 ? `#${[...m[1]].map((x) => x + x).join('')}` : `#${m[1]}`;
+};
+
 export default function Settings() {
   const { store, mutate, refresh } = useStore();
   const [drafts, setDrafts] = useState({});
   const [defaultCpp, setDefaultCpp] = useState(store.settings.defaultCpp ?? 1.5);
-  const [newProgram, setNewProgram] = useState({ name: '', issuer: '', cpp: 1.5, color: PALETTE[5] });
+  const [newProgram, setNewProgram] = useState({ name: '', issuer: '', cpp: 1.5, color: toHex6(PALETTE[5]) });
   // Inline edit of one program's name / issuer / colour: { id, name, issuer, color, error }.
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -67,10 +74,10 @@ export default function Settings() {
         history: [],
       })
     );
-    setNewProgram({ name: '', issuer: '', cpp: 1.5, color: PALETTE[5] });
+    setNewProgram({ name: '', issuer: '', cpp: 1.5, color: toHex6(PALETTE[5]) });
   }
 
-  const startEdit = (p) => setEditing({ id: p.id, name: p.name, issuer: p.issuer || '', color: p.color || PALETTE[5], error: '' });
+  const startEdit = (p) => setEditing({ id: p.id, name: p.name, issuer: p.issuer || '', color: toHex6(p.color), error: '' });
   const setEdit = (k) => (e) => setEditing((ed) => ({ ...ed, [k]: e.target.value, error: '' }));
 
   async function saveEdit() {
@@ -259,17 +266,13 @@ export default function Settings() {
                       <>
                         <td>
                           <div className="edit-name">
-                            <select
+                            <input
+                              type="color"
                               aria-label="Color"
                               className="color-pick"
                               value={ed.color}
                               onChange={setEdit('color')}
-                              style={{ background: ed.color }}
-                            >
-                              {[...new Set([ed.color, ...PALETTE])].map((c) => (
-                                <option key={c} value={c} style={{ background: c }}>{c}</option>
-                              ))}
-                            </select>
+                            />
                             <input aria-label="Name" value={ed.name} onChange={setEdit('name')} onKeyDown={editKeys} autoFocus />
                           </div>
                           {ed.error && <div className="field-error">{ed.error}</div>}
@@ -346,9 +349,16 @@ export default function Settings() {
             </div>
             <div className="field" style={{ maxWidth: 120 }}>
               <label>Color</label>
-              <select value={newProgram.color} onChange={(e) => setNewProgram((n) => ({ ...n, color: e.target.value }))}>
-                {PALETTE.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <div className="color-field">
+                <input
+                  type="color"
+                  className="color-pick"
+                  aria-label="Color"
+                  value={newProgram.color}
+                  onChange={(e) => setNewProgram((n) => ({ ...n, color: e.target.value }))}
+                />
+                <span className="mono small muted">{newProgram.color.toUpperCase()}</span>
+              </div>
             </div>
             <div className="field" style={{ maxWidth: 120, display: 'flex', alignItems: 'flex-end' }}>
               <button type="submit">Add</button>
