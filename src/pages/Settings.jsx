@@ -13,6 +13,8 @@ export default function Settings() {
   const [drafts, setDrafts] = useState({});
   const [defaultCpp, setDefaultCpp] = useState(store.settings.defaultCpp ?? 1.5);
   const [newProgram, setNewProgram] = useState({ name: '', issuer: '', cpp: 1.5, color: PALETTE[5] });
+  // Inline edit of one program's name / issuer / colour: { id, name, issuer, color, error }.
+  const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [sync, setSync] = useState(() => getCreds());
@@ -67,6 +69,24 @@ export default function Settings() {
     );
     setNewProgram({ name: '', issuer: '', cpp: 1.5, color: PALETTE[5] });
   }
+
+  const startEdit = (p) => setEditing({ id: p.id, name: p.name, issuer: p.issuer || '', color: p.color || PALETTE[5], error: '' });
+  const setEdit = (k) => (e) => setEditing((ed) => ({ ...ed, [k]: e.target.value, error: '' }));
+
+  async function saveEdit() {
+    const name = editing.name.trim();
+    if (!name) return setEditing((ed) => ({ ...ed, error: 'Name can’t be empty.' }));
+    // Imports match programs by name, so two with the same name would be ambiguous.
+    const clash = store.programs.find((p) => p.id !== editing.id && p.name.trim().toLowerCase() === name.toLowerCase());
+    if (clash) return setEditing((ed) => ({ ...ed, error: `There’s already a program called “${clash.name}”.` }));
+    await mutate(() => api.update('programs', editing.id, { name, issuer: editing.issuer.trim(), color: editing.color }));
+    setEditing(null);
+  }
+
+  const editKeys = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
+    if (e.key === 'Escape') setEditing(null);
+  };
 
   async function deleteProgram(p) {
     const rdms = store.redemptions.filter((r) => r.programId === p.id).length;
@@ -232,10 +252,38 @@ export default function Settings() {
                 const effective = shown === '' ? Number(defaultCpp) || 0 : Number(shown) || 0;
                 const points = (Number(p.balance) || 0) +
                   store.redemptions.filter((r) => r.programId === p.id).reduce((s, r) => s + (Number(r.points) || 0), 0);
+                const ed = editing?.id === p.id ? editing : null;
                 return (
                   <tr key={p.id}>
-                    <td className="nowrap"><span className="dot" style={{ background: p.color }} />{p.name}</td>
-                    <td className="muted small">{p.issuer}</td>
+                    {ed ? (
+                      <>
+                        <td>
+                          <div className="edit-name">
+                            <select
+                              aria-label="Color"
+                              className="color-pick"
+                              value={ed.color}
+                              onChange={setEdit('color')}
+                              style={{ background: ed.color }}
+                            >
+                              {[...new Set([ed.color, ...PALETTE])].map((c) => (
+                                <option key={c} value={c} style={{ background: c }}>{c}</option>
+                              ))}
+                            </select>
+                            <input aria-label="Name" value={ed.name} onChange={setEdit('name')} onKeyDown={editKeys} autoFocus />
+                          </div>
+                          {ed.error && <div className="field-error">{ed.error}</div>}
+                        </td>
+                        <td>
+                          <input aria-label="Issuer" value={ed.issuer} onChange={setEdit('issuer')} onKeyDown={editKeys} placeholder="Issuer" />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="nowrap"><span className="dot" style={{ background: p.color }} />{p.name}</td>
+                        <td className="muted small">{p.issuer}</td>
+                      </>
+                    )}
                     <td>
                       <input
                         type="number"
@@ -249,7 +297,19 @@ export default function Settings() {
                     </td>
                     <td className="num mono muted">{Math.round(points).toLocaleString()}</td>
                     <td className="num mono">{fmtUSD((points * effective) / 100, { cents: false })}</td>
-                    <td className="num"><button className="danger sm" onClick={() => deleteProgram(p)}>Delete</button></td>
+                    <td className="num nowrap">
+                      {ed ? (
+                        <>
+                          <button className="sm" onClick={saveEdit}>Save</button>{' '}
+                          <button className="ghost sm" onClick={() => setEditing(null)}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="ghost sm" onClick={() => startEdit(p)}>Edit</button>{' '}
+                          <button className="danger sm" onClick={() => deleteProgram(p)}>Delete</button>
+                        </>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

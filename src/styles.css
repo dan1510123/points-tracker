@@ -110,6 +110,15 @@ tbody tr:hover { background: var(--panel-2); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .table-wrap { overflow-x: auto; }
 
+/* Inline program edit (Settings): colour swatch + name side by side. */
+.edit-name { display: flex; align-items: center; gap: 8px; min-width: 200px; }
+.color-pick {
+  flex: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--line);
+  color: transparent; cursor: pointer; appearance: none; -webkit-appearance: none;
+}
+.color-pick option { color: #fff; }
+.field-error { color: var(--bad); font-size: 12px; margin-top: 4px; }
+
 /* A sortable header is a button, but has to read as a header. */
 .th-sort {
   background: none;

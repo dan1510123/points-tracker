@@ -36,7 +36,7 @@ This is the main thing that differs from commercial trackers, which apply their 
 - **Points I have** — current balance per program, entered by hand; each save records a dated snapshot so a trend builds over time, plus points earned all time per program
 - **Points I've used** — the redemption ledger: add, edit, filter, search — and transfers to partners, plus a duplicate check over everything logged
 - **Import CSV** — bulk-backfill redemption history from a CSV or JSON file
-- **Settings** — cents-per-point per program, add/remove programs, export/import all app data, and private-gist sync
+- **Settings** — cents-per-point per program, add, edit (name, issuer, color) and remove programs, export/import all app data, and private-gist sync
 
 ## Duplicates are blocked
 
@@ -207,4 +207,4 @@ data** (from an exported backup) or gist sync — nothing personal is ever built
 
 ## Adding programs
 
-Settings → Add a program. Works for hotel currencies, other airlines, anything with a point balance.
+Settings → Add a program; **Edit** on any row renames it or changes its issuer or color. Works for hotel currencies, other airlines, anything with a point balance.
