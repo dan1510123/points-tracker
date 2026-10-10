@@ -189,7 +189,15 @@ export function earnedSummary(store) {
   return {
     byProgram,
     totalEarned: byProgram.reduce((s, r) => s + r.earned, 0),
+    totalEarnedValue: byProgram.reduce((s, r) => s + r.earnedValue, 0),
     totalTransferredIn: byProgram.reduce((s, r) => s + r.transferredIn, 0),
+    totalTransferredOut: byProgram.reduce((s, r) => s + r.transferredOut, 0),
+    // Transferred points priced where they left vs. where they landed. Their
+    // difference is exactly why total Earned $ and total Lifetime $ disagree:
+    // earned prices a moved point at its source's cpp, lifetime at its
+    // destination's.
+    transferredOutValue: byProgram.reduce((s, r) => s + valueOf(r.transferredOut, r.program, settings), 0),
+    transferredInValue: byProgram.reduce((s, r) => s + valueOf(r.transferredIn, r.program, settings), 0),
   };
 }
 

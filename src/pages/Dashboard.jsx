@@ -254,9 +254,7 @@ export default function Dashboard() {
                   </td>
                   <td className="num mono">
                     <strong>{fmtPoints(earned.totalEarned)}</strong>
-                    <div className="muted small">
-                      {fmtUSD(earned.byProgram.reduce((s, x) => s + x.earnedValue, 0), { cents: false })}
-                    </div>
+                    <div className="muted small">{fmtUSD(earned.totalEarnedValue, { cents: false })}</div>
                   </td>
                   <td className="num mono">
                     <strong>{fmtUSD(redeemed.totalValue + held.totalValue, { cents: false })}</strong>
@@ -270,6 +268,7 @@ export default function Dashboard() {
             on its own, rather than what you moved into it. <strong>Lifetime</strong> is value used plus value held. Every dollar figure — including the muted ones under the point totals — is priced at your cpp for
             that program.
           </p>
+          <TransferGap earned={earned} lifetimeValue={redeemed.totalValue + held.totalValue} />
         </div>
       </div>
 
@@ -357,5 +356,31 @@ export default function Dashboard() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * One line reconciling the Earned and Lifetime dollar totals, which differ only
+ * because a transferred point is priced at its source's cpp in Earned and at
+ * its destination's cpp in Lifetime.
+ */
+function TransferGap({ earned, lifetimeValue }) {
+  // Work from the figures as displayed so the sentence matches the table to
+  // the dollar, rather than drifting by one from separate rounding.
+  const gap = Math.round(earned.totalEarnedValue) - Math.round(lifetimeValue);
+  if (earned.totalTransferredOut === 0 || gap === 0) return null;
+  const before = Math.round(earned.transferredOutValue);
+  const after = before - gap;
+  const usd = (n) => fmtUSD(n, { cents: false });
+  return (
+    <p className="muted small" style={{ marginTop: 8, marginBottom: 0 }}>
+      <strong>Why Earned and Lifetime totals differ:</strong> transfers. At your rates, the{' '}
+      {fmtPoints(earned.totalTransferredOut)} points you moved out were worth {usd(before)} before the transfer and{' '}
+      {usd(after)} after: {gap > 0 ? (
+        <><strong>{usd(gap)} lost</strong> in the move, because some landed in programs you value lower than the ones they left.</>
+      ) : (
+        <><strong className="good">{usd(-gap)} gained</strong> in the move, thanks to transfer bonuses or programs you value higher.</>
+      )}
+    </p>
   );
 }
