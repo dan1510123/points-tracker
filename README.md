@@ -179,8 +179,10 @@ section entirely — everything else in the app works without it.
 ### Conflicts
 
 Gists have no compare-and-swap, so last write wins and there is nothing to stop one device silently overwriting the
-other. What the app does instead: it remembers the gist's `updated_at` from the last time *this* browser synced, and
-checks it before pushing. If the gist has moved since — almost always the other device having pushed — a manual push
+other. What the app does instead: it remembers the gist's `updated_at` from the last time *this* browser synced, plus
+a fingerprint of the content it synced, and checks both before pushing. A gist that reads as older than that, or whose
+content is unchanged, is GitHub catching up with this browser's own last push — not a conflict. If the gist has really
+moved since — almost always the other device having pushed — a manual push
 stops and asks, naming the time it was written, before it overwrites anything, and an automatic push is held back and
 flagged in the sidebar and Settings. Pulling first is the way out. If both sides changed by the time the page loads
 (an unpushed save here, a newer push from elsewhere), the app asks which copy to keep.

@@ -19,6 +19,8 @@ const K = {
   gist: 'pointstracker:gist',
   // Per-gist so switching gists can't inherit the other one's freshness mark.
   seen: (id) => `pointstracker:gistUpdatedAt:${id}`,
+  // Fingerprint of the content last pushed to / pulled from that gist.
+  hash: (id) => `pointstracker:gistHash:${id}`,
   // Auto-sync is on unless switched off; stored as '0' / '1'.
   auto: 'pointstracker:autoSync',
   // '1' when this browser has local writes the gist hasn't received yet.
@@ -78,7 +80,7 @@ export function forgetCreds() {
   const id = getGistId();
   store.del(K.token);
   store.del(K.gist);
-  if (id) store.del(K.seen(id));
+  if (id) { store.del(K.seen(id)); store.del(K.hash(id)); }
   emit();
 }
 
@@ -118,7 +120,42 @@ export function lastSeen(gistId) {
   return (gistId && store.get(K.seen(gistId))) || '';
 }
 
-const markSeen = (gistId, updatedAt) => store.set(K.seen(gistId), updatedAt || '');
+/** Remember the gist's updated_at and a fingerprint of its content as of a sync. */
+export function markSeen(gistId, updatedAt, text) {
+  store.set(K.seen(gistId), updatedAt || '');
+  if (text !== undefined) store.set(K.hash(gistId), hashOf(text));
+}
+
+/** Small, fast string fingerprint (FNV-1a) — enough to tell "same file" apart. */
+function hashOf(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
+}
+
+/**
+ * Has the gist really changed since this browser last synced with it?
+ *
+ * Comparing updated_at alone raised false conflicts against this browser's own
+ * last push: a read soon after a write can come back from a lagging copy with
+ * the older timestamp, and GitHub can move updated_at without the content
+ * changing. So it only counts when the gist is *newer* than what was last seen
+ * *and* its content differs from what was last synced.
+ */
+export function changedSince(gistId, remoteUpdatedAt, remoteText) {
+  const known = lastSeen(gistId);
+  if (!known) return true; // never synced here: anything there is news
+  if (!remoteUpdatedAt || remoteUpdatedAt === known) return false;
+  const remote = Date.parse(remoteUpdatedAt);
+  const seen = Date.parse(known);
+  if (remote < seen) return false; // a stale read, older than our own last sync
+  const lastHash = store.get(K.hash(gistId));
+  if (lastHash && remoteText !== undefined && hashOf(remoteText) === lastHash) return false;
+  return true;
+}
 
 /* ---------- transport ---------- */
 
@@ -137,7 +174,8 @@ const headers = (token) => ({
 });
 
 async function call(url, token, init = {}, ctx = {}) {
-  const res = await fetch(url, { ...init, headers: { ...headers(token), ...(init.headers || {}) } });
+  // no-store: a sync decision must never rest on a browser-cached copy.
+  const res = await fetch(url, { cache: 'no-store', ...init, headers: { ...headers(token), ...(init.headers || {}) } });
   if (!res.ok) {
     // GitHub's error bodies are JSON but long; the first line is the useful part.
     let detail = res.statusText;
@@ -163,12 +201,11 @@ async function readGist(token, gistId, signal) {
   return call(`${API}/${gistId}`, token, { signal });
 }
 
-/** Body of the store file, following raw_url when GitHub truncates a big gist. */
-async function fileContent(gist, signal) {
+/** Raw text of the store file, following raw_url when GitHub truncates a big gist. */
+async function fileText(gist, signal) {
   const f = gist.files?.[FILENAME];
   if (!f) throw new Error(`That gist has no ${FILENAME} — is it the right id?`);
-  const text = f.truncated ? await (await fetch(f.raw_url, { signal })).text() : f.content;
-  return JSON.parse(text);
+  return f.truncated ? (await fetch(f.raw_url, { signal, cache: 'no-store' })).text() : f.content;
 }
 
 /**
@@ -183,16 +220,18 @@ export async function pushStore({ token, gistId, data, force = false }) {
   if (!token) throw new Error('Add a token first.');
 
   if (gistId && !force) {
-    const known = lastSeen(gistId);
-    if (known) {
+    if (lastSeen(gistId)) {
       const current = await readGist(token, gistId);
-      if (current.updated_at && current.updated_at !== known) {
-        throw new GistConflictError(current.updated_at);
+      if (current.updated_at !== lastSeen(gistId)) {
+        // Only fetch the body when the timestamp alone can't settle it.
+        const text = await fileText(current).catch(() => undefined);
+        if (changedSince(gistId, current.updated_at, text)) throw new GistConflictError(current.updated_at);
       }
     }
   }
 
-  const body = { files: { [FILENAME]: { content: JSON.stringify(data, null, 2) } } };
+  const content = JSON.stringify(data, null, 2);
+  const body = { files: { [FILENAME]: { content } } };
   if (!gistId) {
     body.description = 'Points Tracker data';
     body.public = false; // private on creation; GitHub will not let this be changed later
@@ -205,19 +244,24 @@ export async function pushStore({ token, gistId, data, force = false }) {
   }, { creating: !gistId });
 
   saveCreds(token, gist.id);
-  markSeen(gist.id, gist.updated_at);
+  markSeen(gist.id, gist.updated_at, content);
   return { gistId: gist.id, updatedAt: gist.updated_at, created: !gistId };
 }
 
-/** Read the gist back. The caller is what actually replaces local data. */
-export async function pullStore({ token, gistId, signal }) {
+/**
+ * Read the gist back. The caller is what actually replaces local data.
+ * `mark: false` leaves the freshness mark alone, for a caller that first needs
+ * to compare against it (and may decide this copy is stale).
+ */
+export async function pullStore({ token, gistId, signal, mark = true }) {
   if (!token || !gistId) throw new Error('Need both a token and a gist id.');
   const gist = await readGist(token, gistId, signal);
-  const data = await fileContent(gist, signal);
+  const text = await fileText(gist, signal);
+  const data = JSON.parse(text);
   if (!data || typeof data !== 'object' || !Array.isArray(data.redemptions)) {
     throw new Error('That file does not look like a Points Tracker export.');
   }
   saveCreds(token, gistId);
-  markSeen(gistId, gist.updated_at);
-  return { data, updatedAt: gist.updated_at };
+  if (mark) markSeen(gistId, gist.updated_at, text);
+  return { data, text, updatedAt: gist.updated_at };
 }

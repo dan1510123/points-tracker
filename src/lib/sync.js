@@ -20,7 +20,8 @@ import {
   getAutoSync,
   isDirty,
   markDirty,
-  lastSeen,
+  changedSince,
+  markSeen,
   pushStore,
   pullStore,
   subscribe as subscribeCreds,
@@ -167,7 +168,6 @@ export function startup() {
 async function loadFromGist() {
   if (!autoSyncEnabled()) return;
   const creds = getCreds();
-  const known = lastSeen(creds.gistId);
   setStatus('pulling');
 
   // Abort rather than race: a pull that lands late would mark the gist as
@@ -176,7 +176,7 @@ async function loadFromGist() {
   const t = setTimeout(() => ctl.abort(), LOAD_TIMEOUT_MS);
   let remote;
   try {
-    remote = await pullStore({ ...creds, signal: ctl.signal });
+    remote = await pullStore({ ...creds, signal: ctl.signal, mark: false });
   } catch (err) {
     const why = err.name === 'AbortError' ? 'GitHub took too long to answer' : err.message;
     setStatus('error', { message: `Couldn’t load from the gist (${why}). Showing this device’s copy.` });
@@ -185,10 +185,11 @@ async function loadFromGist() {
     clearTimeout(t);
   }
 
-  const { data, updatedAt } = remote;
-  if (updatedAt === known) {
-    // Gist unchanged since this device last synced: local is current. Any
-    // unpushed local writes go up in startup()'s finally.
+  const { data, text, updatedAt } = remote;
+  if (!changedSince(creds.gistId, updatedAt, text)) {
+    // Nothing new since this device last synced (or a stale read older than
+    // it): local is current, so never load this copy over it. Any unpushed
+    // local writes go up in startup()'s finally.
     setStatus('synced', { at: updatedAt });
     return;
   }
@@ -208,5 +209,6 @@ async function loadFromGist() {
     }
   }
 
+  markSeen(creds.gistId, updatedAt, text);
   applyRemote(data, updatedAt);
 }
