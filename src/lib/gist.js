@@ -19,6 +19,12 @@ const K = {
   gist: 'pointstracker:gist',
   // Per-gist so switching gists can't inherit the other one's freshness mark.
   seen: (id) => `pointstracker:gistUpdatedAt:${id}`,
+  // Auto-sync is on unless switched off; stored as '0' / '1'.
+  auto: 'pointstracker:autoSync',
+  // '1' when this browser has local writes the gist hasn't received yet.
+  dirty: 'pointstracker:dirty',
+  // '1' once the user ticks "Don't show this again" on the local-only reminder.
+  nudgeOff: 'pointstracker:localNudgeOff',
 };
 
 // localStorage throws in some embedded/private contexts; fall back to memory
@@ -76,6 +82,37 @@ export function forgetCreds() {
   emit();
 }
 
+/** Push on every save and pull on page load. On by default once a gist is set. */
+export function getAutoSync() {
+  return store.get(K.auto) !== '0';
+}
+
+export function setAutoSync(on) {
+  store.set(K.auto, on ? '1' : '0');
+  emit();
+}
+
+/** Whether the "only saved in this browser" reminder has been switched off. */
+export function getLocalNudgeOff() {
+  return store.get(K.nudgeOff) === '1';
+}
+
+export function setLocalNudgeOff(on) {
+  if (on) store.set(K.nudgeOff, '1');
+  else store.del(K.nudgeOff);
+}
+
+/** Whether this browser holds writes the gist hasn't seen. Survives reloads, so
+ *  a save made offline (or right before closing the tab) is still pushed later. */
+export function isDirty() {
+  return store.get(K.dirty) === '1';
+}
+
+export function markDirty(on) {
+  if (on) store.set(K.dirty, '1');
+  else store.del(K.dirty);
+}
+
 /** When this browser last saw the gist — the basis for conflict detection. */
 export function lastSeen(gistId) {
   return (gistId && store.get(K.seen(gistId))) || '';
@@ -122,15 +159,15 @@ async function call(url, token, init = {}, ctx = {}) {
   return res.json();
 }
 
-async function readGist(token, gistId) {
-  return call(`${API}/${gistId}`, token);
+async function readGist(token, gistId, signal) {
+  return call(`${API}/${gistId}`, token, { signal });
 }
 
 /** Body of the store file, following raw_url when GitHub truncates a big gist. */
-async function fileContent(gist) {
+async function fileContent(gist, signal) {
   const f = gist.files?.[FILENAME];
   if (!f) throw new Error(`That gist has no ${FILENAME} — is it the right id?`);
-  const text = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+  const text = f.truncated ? await (await fetch(f.raw_url, { signal })).text() : f.content;
   return JSON.parse(text);
 }
 
@@ -173,10 +210,10 @@ export async function pushStore({ token, gistId, data, force = false }) {
 }
 
 /** Read the gist back. The caller is what actually replaces local data. */
-export async function pullStore({ token, gistId }) {
+export async function pullStore({ token, gistId, signal }) {
   if (!token || !gistId) throw new Error('Need both a token and a gist id.');
-  const gist = await readGist(token, gistId);
-  const data = await fileContent(gist);
+  const gist = await readGist(token, gistId, signal);
+  const data = await fileContent(gist, signal);
   if (!data || typeof data !== 'object' || !Array.isArray(data.redemptions)) {
     throw new Error('That file does not look like a Points Tracker export.');
   }

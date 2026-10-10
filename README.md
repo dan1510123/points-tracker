@@ -151,9 +151,23 @@ Same mechanism the perk-graph project uses.
    created and its id appears in the field.
 5. On the other device, paste the same token and that gist id, then **Pull from gist**.
 
-After that it's two buttons: **Push to gist** writes this device's data up, **Pull from gist** brings the other device's
-data down. **Forget token** clears both fields from this browser and leaves the gist itself alone. The sidebar shows
-which gist is in play, or `local only` when sync is off.
+After that it's automatic. With **Auto-sync** on (the default once a gist is set up):
+
+- **Every save pushes.** Any change — a balance, a redemption, a rate, an import — is pushed to the gist a moment later.
+  A burst of saves becomes one push. A save that couldn't be pushed (offline, tab closed too soon) is remembered and
+  pushed the next time the page opens.
+- **Every page load pulls.** Opening the app checks the gist first; if another device changed it, that copy is loaded
+  (with a snapshot of this device's data taken first) before anything is shown.
+
+Untick **Auto-sync** to go back to doing it by hand: **Push to gist** writes this device's data up, **Pull from gist**
+brings the other device's data down — both buttons work either way. **Forget token** clears both fields from this
+browser and leaves the gist itself alone. The sidebar shows which gist is in play and whether the last save reached it,
+or `local only` when sync is off.
+
+### Without it
+
+While no gist is set up, each save brings up a small reminder that the data is only in this browser, with a link
+straight to the gist settings. Tick **Don't show this again** in the reminder to stop it.
 
 ### What it costs you in privacy
 
@@ -166,8 +180,10 @@ section entirely — everything else in the app works without it.
 
 Gists have no compare-and-swap, so last write wins and there is nothing to stop one device silently overwriting the
 other. What the app does instead: it remembers the gist's `updated_at` from the last time *this* browser synced, and
-checks it before pushing. If the gist has moved since — almost always the other device having pushed — the push stops
-and asks, naming the time it was written, before it overwrites anything. Pulling first is the way out.
+checks it before pushing. If the gist has moved since — almost always the other device having pushed — a manual push
+stops and asks, naming the time it was written, before it overwrites anything, and an automatic push is held back and
+flagged in the sidebar and Settings. Pulling first is the way out. If both sides changed by the time the page loads
+(an unpushed save here, a newer push from elsewhere), the app asks which copy to keep.
 
 A pull replaces everything on this device, and snapshots the current data (the same in-browser safety net that Import
 uses) before it does.

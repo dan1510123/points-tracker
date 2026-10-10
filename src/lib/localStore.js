@@ -78,11 +78,22 @@ function normalize(parsed) {
   return next;
 }
 
+/* ---------- write listeners, so gist sync can follow every save ---------- */
+
+const writeListeners = new Set();
+
+/** Called after every non-silent writeStore. Returns an unsubscribe. */
+export function onWrite(fn) {
+  writeListeners.add(fn);
+  return () => writeListeners.delete(fn);
+}
+
 export function readStore() {
   const stored = raw.get(KEY);
   if (stored === null) {
     const seed = defaultStore();
-    writeStore(seed);
+    // Seeding isn't a user save — it mustn't push defaults over a real gist.
+    writeStore(seed, { silent: true });
     return seed;
   }
   try {
@@ -92,13 +103,16 @@ export function readStore() {
     // as the server quarantined an unreadable store.json.
     pushBackup(`corrupt-${new Date().toISOString()}`, stored);
     const seed = defaultStore();
-    writeStore(seed);
+    writeStore(seed, { silent: true });
     return seed;
   }
 }
 
-export function writeStore(next) {
+/** `silent` skips the write listeners — for seeding, and for data that just
+ *  came *from* the gist and so has nothing to push back. */
+export function writeStore(next, { silent = false } = {}) {
   raw.set(KEY, JSON.stringify(next));
+  if (!silent) writeListeners.forEach((fn) => fn());
   return next;
 }
 

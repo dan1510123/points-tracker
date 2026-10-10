@@ -54,6 +54,7 @@ a { color: var(--accent); text-decoration: none; }
 .navlink:hover { background: var(--panel-2); color: var(--text); }
 .navlink.active { background: var(--panel-2); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
 .sidebar-foot { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.sidebar-foot .sync-bad { color: var(--bad); }
 
 /* ---------- main ---------- */
 .main { flex: 1; padding: 28px 32px 64px; max-width: 1400px; min-width: 0; }
@@ -177,6 +178,19 @@ button.sm { padding: 5px 9px; font-size: 12px; }
 .error { background: #3a1a1e; border: 1px solid var(--bad); color: #ffd7d9; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
 .notice { background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; color: var(--muted); }
 .notice strong { color: var(--text); }
+
+/* "Saved only in this browser" reminder, shown after saves while no gist is set. */
+.nudge {
+  position: fixed; right: 20px; bottom: 20px; z-index: 60; width: 340px; max-width: calc(100vw - 32px);
+  background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--warn);
+  border-radius: 10px; padding: 14px 16px; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.nudge p { margin: 6px 0 12px; color: var(--muted); }
+.nudge a { color: var(--accent); }
+.nudge-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nudge-foot label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.nudge-foot input { width: auto; margin: 0; }
+@media (max-width: 720px) { .nudge { right: 16px; left: 16px; bottom: 16px; width: auto; } }
 
 .stack { display: flex; flex-direction: column; gap: 14px; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
