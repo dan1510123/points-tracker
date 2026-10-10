@@ -164,6 +164,11 @@ brings the other device's data down — both buttons work either way. **Forget t
 browser and leaves the gist itself alone. The sidebar shows which gist is in play and whether the last save reached it,
 or `local only` when sync is off.
 
+### Without it
+
+While no gist is set up, each save brings up a small reminder that the data is only in this browser, with a link
+straight to the gist settings. Tick **Don't show this again** in the reminder to stop it.
+
 ### What it costs you in privacy
 
 The token lives in this browser's `localStorage` and is sent to `api.github.com` and nowhere else. There is no backend

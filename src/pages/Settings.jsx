@@ -1,4 +1,5 @@
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStore } from '../StoreContext.jsx';
 import { api } from '../api.js';
 import { holdingsSummary, redemptionSummary, fmtUSD } from '../lib/calc.js';
@@ -19,6 +20,15 @@ export default function Settings() {
   const [syncMsg, setSyncMsg] = useState(null);
   const autoSync = useSyncExternalStore(subscribeCreds, getAutoSync);
   const syncStatus = useSyncExternalStore(subscribeStatus, getStatus);
+
+  // The local-only save reminder links here with ?section=gist.
+  const gistCard = useRef(null);
+  const { search, key } = useLocation();
+  useEffect(() => {
+    if (new URLSearchParams(search).get('section') === 'gist') {
+      gistCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [search, key]); // key: re-scroll when the link is followed again from this page
 
   const held = holdingsSummary(store);
   const redeemed = redemptionSummary(store);
@@ -310,7 +320,7 @@ export default function Settings() {
         </p>
       </div>
 
-      <div className="card pad-lg" style={{ marginTop: 16 }}>
+      <div className="card pad-lg" style={{ marginTop: 16 }} id="gist-sync" ref={gistCard}>
         <h2>Sync to a private gist</h2>
         <p className="muted small">
           Optional, and off until you fill this in. Make a <strong>classic</strong> token at{' '}

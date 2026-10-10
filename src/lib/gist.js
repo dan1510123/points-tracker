@@ -23,6 +23,8 @@ const K = {
   auto: 'pointstracker:autoSync',
   // '1' when this browser has local writes the gist hasn't received yet.
   dirty: 'pointstracker:dirty',
+  // '1' once the user ticks "Don't show this again" on the local-only reminder.
+  nudgeOff: 'pointstracker:localNudgeOff',
 };
 
 // localStorage throws in some embedded/private contexts; fall back to memory
@@ -88,6 +90,16 @@ export function getAutoSync() {
 export function setAutoSync(on) {
   store.set(K.auto, on ? '1' : '0');
   emit();
+}
+
+/** Whether the "only saved in this browser" reminder has been switched off. */
+export function getLocalNudgeOff() {
+  return store.get(K.nudgeOff) === '1';
+}
+
+export function setLocalNudgeOff(on) {
+  if (on) store.set(K.nudgeOff, '1');
+  else store.del(K.nudgeOff);
 }
 
 /** Whether this browser holds writes the gist hasn't seen. Survives reloads, so

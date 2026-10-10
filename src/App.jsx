@@ -9,6 +9,7 @@ import RedemptionForm from './pages/RedemptionForm.jsx';
 import Balances from './pages/Balances.jsx';
 import Import from './pages/Import.jsx';
 import Settings from './pages/Settings.jsx';
+import LocalSaveNudge from './LocalSaveNudge.jsx';
 
 const NAV = [
   ['/', 'Dashboard'],
@@ -107,6 +108,8 @@ export default function App() {
           </Routes>
         )}
       </main>
+
+      <LocalSaveNudge />
     </div>
   );
 }
