@@ -190,6 +190,39 @@ button.sm { padding: 5px 9px; font-size: 12px; }
 .nudge-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .nudge-foot label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; cursor: pointer; }
 .nudge-foot input { width: auto; margin: 0; }
+/* Sync result toast: bottom-centre, slides up, fades out on its own. */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 60; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 14px; border-radius: 999px; font-size: 13px; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: toast-in 220ms ease-out;
+}
+.toast-icon {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none;
+  border-radius: 50%; font-size: 12px; font-weight: 700; color: var(--bg);
+}
+.toast-ok .toast-icon { background: var(--good); }
+.toast-bad { border-color: var(--bad); }
+.toast-bad .toast-icon { background: var(--bad); }
+.toast-link { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.toast-close {
+  background: transparent; color: var(--muted); padding: 2px 6px; font-size: 12px; line-height: 1; border: 0;
+}
+.toast-close:hover { color: var(--text); filter: none; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+@media (max-width: 720px) {
+  .toast { left: 16px; right: 16px; bottom: 16px; transform: none; border-radius: 12px; animation-name: toast-in-mobile; }
+  .toast-text { flex: 1; }
+}
+@keyframes toast-in-mobile {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
 @media (max-width: 720px) { .nudge { right: 16px; left: 16px; bottom: 16px; width: auto; } }
 
 .stack { display: flex; flex-direction: column; gap: 14px; }
