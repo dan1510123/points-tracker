@@ -1,7 +1,8 @@
 import React, { useState, useSyncExternalStore } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useStore } from './StoreContext.jsx';
-import { subscribe, getGistId } from './lib/gist.js';
+import { subscribe, getGistId, getAutoSync } from './lib/gist.js';
+import { subscribeStatus, getStatus } from './lib/sync.js';
 import Dashboard from './pages/Dashboard.jsx';
 import Redemptions from './pages/Redemptions.jsx';
 import RedemptionForm from './pages/RedemptionForm.jsx';
@@ -37,6 +38,8 @@ export default function App() {
   const active = activePath(useLocation().pathname);
   // '' when sync is off, so the footer can say plainly where the data goes.
   const gistId = useSyncExternalStore(subscribe, getGistId, () => '');
+  const autoSync = useSyncExternalStore(subscribe, getAutoSync);
+  const sync = useSyncExternalStore(subscribeStatus, getStatus);
   // Off-canvas nav drawer, mobile only (the CSS ignores this class ≥ 720px).
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -79,7 +82,7 @@ export default function App() {
         <div className="sidebar-foot">
           Data lives in this browser
           <br />
-          {gistId ? <>syncing to gist <code>{gistId.slice(0, 7)}</code></> : 'local only'}
+          {gistId ? <SyncLine gistId={gistId} autoSync={autoSync} sync={sync} /> : 'local only'}
         </div>
       </nav>
 
@@ -90,7 +93,7 @@ export default function App() {
           </div>
         )}
         {!store ? (
-          <div className="empty">Loading…</div>
+          <div className="empty">{sync.state === 'pulling' ? 'Loading the latest from your gist…' : 'Loading…'}</div>
         ) : (
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -106,4 +109,18 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+/** Sidebar footer: which gist, and where the last save got to. */
+function SyncLine({ gistId, autoSync, sync }) {
+  const id = <code>{gistId.slice(0, 7)}</code>;
+  if (!autoSync) return <>gist {id} · auto-sync off</>;
+  switch (sync.state) {
+    case 'pulling': return <>pulling from gist {id}…</>;
+    case 'pending':
+    case 'pushing': return <>saving to gist {id}…</>;
+    case 'conflict': return <span className="sync-bad">gist {id} changed elsewhere — see Settings</span>;
+    case 'error': return <span className="sync-bad">gist sync failed — see Settings</span>;
+    default: return <>synced to gist {id}</>;
+  }
 }

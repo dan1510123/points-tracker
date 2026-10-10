@@ -54,6 +54,7 @@ a { color: var(--accent); text-decoration: none; }
 .navlink:hover { background: var(--panel-2); color: var(--text); }
 .navlink.active { background: var(--panel-2); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
 .sidebar-foot { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.sidebar-foot .sync-bad { color: var(--bad); }
 
 /* ---------- main ---------- */
 .main { flex: 1; padding: 28px 32px 64px; max-width: 1400px; min-width: 0; }

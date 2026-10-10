@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { useStore } from '../StoreContext.jsx';
 import { api } from '../api.js';
 import { holdingsSummary, redemptionSummary, fmtUSD } from '../lib/calc.js';
-import { getCreds, forgetCreds, pushStore, pullStore, GistConflictError } from '../lib/gist.js';
+import { getCreds, forgetCreds, pushStore, pullStore, GistConflictError, getAutoSync, setAutoSync, subscribe as subscribeCreds } from '../lib/gist.js';
+import { applyRemote, noteSynced, subscribeStatus, getStatus } from '../lib/sync.js';
 
 const PALETTE = ['#2E77BC', '#117ACA', '#C8102E', '#111111', '#01426A', '#3ec97a', '#f0b429', '#a06cd5'];
 
@@ -16,6 +17,8 @@ export default function Settings() {
   const [sync, setSync] = useState(() => getCreds());
   const [syncBusy, setSyncBusy] = useState('');
   const [syncMsg, setSyncMsg] = useState(null);
+  const autoSync = useSyncExternalStore(subscribeCreds, getAutoSync);
+  const syncStatus = useSyncExternalStore(subscribeStatus, getStatus);
 
   const held = holdingsSummary(store);
   const redeemed = redemptionSummary(store);
@@ -112,6 +115,7 @@ export default function Settings() {
     try {
       const res = await pushStore({ ...sync, data: store, force });
       setSync((c) => ({ ...c, gistId: res.gistId }));
+      noteSynced(res.updatedAt);
       said(true, res.created
         ? `Created private gist ${res.gistId} and pushed your data. Paste that id on your other device.`
         : `Pushed. The gist now matches this device as of ${new Date(res.updatedAt).toLocaleString()}.`);
@@ -143,7 +147,7 @@ export default function Settings() {
         said(false, 'Pull cancelled. Nothing on this device changed.');
         return;
       }
-      await api.importStore(data);
+      applyRemote(data, updatedAt); // snapshots first, and isn't pushed straight back
       await refresh();
       said(true, `Pulled the copy saved ${new Date(updatedAt).toLocaleString()}.`);
     } catch (err) {
@@ -357,6 +361,15 @@ export default function Settings() {
           <div />{/* spacer: keeps the buttons from stretching across the row */}
         </div>
 
+        <label className="small" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} style={{ width: 'auto' }} />
+          Auto-sync — push to the gist on every save, and load the latest from it when the page opens
+        </label>
+
+        {!syncMsg && (syncStatus.state === 'conflict' || syncStatus.state === 'error') && (
+          <div className="error" style={{ marginTop: 14, marginBottom: 0 }}>{syncStatus.message}</div>
+        )}
+
         {syncMsg && (
           <div className={syncMsg.ok ? 'notice' : 'error'} style={{ marginTop: 14, marginBottom: 0 }}>
             {syncMsg.text}
@@ -364,8 +377,10 @@ export default function Settings() {
         )}
 
         <p className="muted small" style={{ marginTop: 14, marginBottom: 0 }}>
+          Once a gist is set up, auto-sync keeps it current on its own: every save is pushed a moment later, and opening
+          the page pulls the gist's copy if another device changed it. The buttons are still here for doing it by hand.
           Push overwrites the gist; pull overwrites this device, snapshotting the current data first. If the gist moved
-          since this device last synced, the push stops and asks before clobbering the other copy.
+          since this device last synced, nothing is overwritten without asking.
         </p>
       </div>
     </>

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from './api.js';
+import { startup } from './lib/sync.js';
 
 const StoreContext = createContext(null);
 
@@ -16,8 +17,10 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
+  // Pull the latest gist copy (when sync is on) before the first read, so the
+  // page opens on current data rather than flashing a stale local copy.
   useEffect(() => {
-    refresh();
+    startup().finally(refresh);
   }, [refresh]);
 
   // Every mutation re-reads the server copy so the UI can never drift from disk.
